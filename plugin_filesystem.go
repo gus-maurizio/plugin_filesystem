@@ -13,17 +13,12 @@ import (
 )
 
 //	Define the metrics we wish to expose
-var fsPercent = prometheus.NewGaugeVec(
+var fsData = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "sreagent_fs_percent",
+		Name: "sreagent_fs",
 		Help: "Host Filesystem utilization",
-	}, []string{"fsname"} )
+	}, []string{"fsname", "metric"} )
 
-var fsFree = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "sreagent_fs_free",
-		Help: "Host Filesystem free in GB",
-	}, []string{"fsname"} )
 
 
 var PluginConfig 	map[string]map[string]map[string]interface{}
@@ -40,8 +35,8 @@ func PluginMeasure() ([]byte, []byte, float64) {
 		mpoint 		:= fs.Mountpoint
 		fsdata, _ 	:= disk.Usage(mpoint)
 		PluginData[mpoint]  = fsdata
-		fsPercent.With(prometheus.Labels{"fsname":  mpoint}).Set(fsdata.UsedPercent)
-		fsFree.With(prometheus.Labels{"fsname":  mpoint}).Set(float64(fsdata.Free)/(1024.0*1024.0*1024.0))
+		fsData.With(prometheus.Labels{"fsname":  mpoint, "metric": "usedpercent"}).Set(fsdata.UsedPercent)
+		fsData.With(prometheus.Labels{"fsname":  mpoint, "metric": "freespaceGB"}).Set(float64(fsdata.Free)/(1024.0*1024.0*1024.0))
 	}
 	myMeasure, _ := json.Marshal(PluginData)
 	return myMeasure, []byte(""), float64(time.Now().UnixNano())/1e9
@@ -96,8 +91,7 @@ func InitPlugin(config string) {
 		log.WithFields(log.Fields{"config": config}).Error("failed to unmarshal config")
 	}
 	// Register metrics with prometheus
-	prometheus.MustRegister(fsPercent)
-	prometheus.MustRegister(fsFree)
+	prometheus.MustRegister(fsData)
 
 	log.WithFields(log.Fields{"pluginconfig": PluginConfig, "plugindata": PluginData}).Info("InitPlugin")
 }
